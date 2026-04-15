@@ -36,23 +36,20 @@ Set the OpenWrt LAN IP to an unused address in your main router's subnet.
 
 ```sh
 uci set network.lan.ipaddr='192.168.1.2'
-uci set network.lan.gateway='192.168.1.1'
-uci set network.lan.dns='192.168.1.1'
 uci commit network
-service network restart
+/etc/init.d/network restart
 ```
+Now unplug the cable from your computer and connect the it from OpenWrt LAN port to Main Router LAN port
 
+### Step 3 — Disable DHCP on LAN and set Gateway and DNS
 
-
-Default in OpenWrt. Verify under **Network → Wireless → your SSID → Mode = Access Point**.
-
-### Step 3 — Disable DHCP on LAN
-
-Your main router handles DHCP, so disable it here to avoid conflicts.
+Your main router handles DHCP, so disable it here to avoid conflicts. SSH into it with your new OpenWrt LAN IP
 
 ```sh
 uci set dhcp.lan.ignore='1'
 uci commit dhcp
+uci set network.lan.gateway='192.168.1.1'
+uci set network.lan.dns='192.168.1.1'
 service dnsmasq restart
 ```
 
