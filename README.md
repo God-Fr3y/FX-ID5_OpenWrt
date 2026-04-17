@@ -141,7 +141,7 @@ Type `AT` and press Enter. Expected response: `OK`. If no response, check `ls /d
 ### Step 10 — Remove SIM Lock
 
 Inside the picocom session:
-AT+CLCK="PN",0,"3@P#fT&30aTrs4L"
+`AT+CLCK="PN",0,"3@P#fT&30aTrs4L"`
 
 Expected: `OK`  
 If `ERROR`: the modem may already be unlocked, or this code does not apply to your unit.
@@ -153,9 +153,9 @@ Exit picocom: `Ctrl+A` then `Ctrl+X`
 ### Step 11 — Verify Network Registration
 
 Back in picocom:
-AT+CREG?   # +CREG: 0,1  (1=home, 5=roaming)
-AT+CEREG?  # +CEREG: 0,1  (LTE registration)
-AT+CSQ     # +CSQ: 18,0   (signal quality; 99 = no signal)
+`AT+CREG?`   # +CREG: 0,1  (1=home, 5=roaming)
+`AT+CEREG?`  # +CEREG: 0,1  (LTE registration)
+`AT+CSQ`     # +CSQ: 18,0   (signal quality; 99 = no signal)
 
 ---
 
