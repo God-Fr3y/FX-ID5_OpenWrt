@@ -132,16 +132,15 @@ Expected:
 - `ls /dev/ttyACM*` returns `/dev/ttyACM0`
 - `ifconfig usb0` shows the interface is present — no IP yet at this stage, that comes after unlock in Part 3
 
+
+---
+
+## Part 3 — Unlock the Modem
 ### Step 8 — Install picocom
 
 ```sh
 apk add picocom
 ```
-
----
-
-## Part 3 — Unlock the Modem
-
 ### Step 9 — Open AT Command Interface
 
 ```sh
@@ -226,13 +225,11 @@ service firewall restart
 ```sh
 ifconfig usb0
 route -n
-ping -c 4 -I usb0 8.8.8.8
 ```
 
 Expected:
 - `inet addr:100.x.x.x` on usb0
 - `route -n` shows `0.0.0.0  100.x.x.x  0.0.0.0  UG  0  0  0  usb0`
-- 0% packet loss on ping
 
 ---
 
