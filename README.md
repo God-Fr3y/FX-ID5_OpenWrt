@@ -64,11 +64,13 @@ uci commit network
 service network restart
 ```
 
-> You will lose the SSH session after `service network restart` — this is expected. Reconnect to the OpenWrt Wi-Fi and SSH back in at the new IP: `ssh root@192.168.1.2`
+> You will lose the SSH session after `service network restart` — this is expected.
 
 ### Step 3 — Connect the Cable
 
 > **Warning:** Connect the main router's **LAN** port → OpenWrt's **LAN** port. Do NOT use the WAN port — it will cause a routing conflict.
+
+Reconnect to the OpenWrt Wi-Fi and SSH back in at the new IP: `ssh root@192.168.1.2`
 
 ### Step 4 — Test Connectivity
 
