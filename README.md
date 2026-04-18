@@ -1,4 +1,4 @@
-# FX-ID5 LTE Modem Setup
+# FX-ID5 with OpenWrt LTE Modem Setup
 
 OpenWrt 25.05.x · MediaTek MT7628 · Marvell LTE
 
