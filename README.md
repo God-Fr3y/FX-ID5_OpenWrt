@@ -20,6 +20,10 @@ Connect your computer to the FX-ID5 using a LAN cable, then SSH in:
 
 ```sh
 ssh root@192.168.1.1
+```
+
+Change the admin password
+```
 passwd
 ```
 
@@ -38,8 +42,6 @@ uci set wireless.default_radio0.key='Pass@1234'
 uci commit wireless
 wifi up
 ```
-
-Disconnect the LAN cable and connect your computer to the OpenWrt Wi-Fi.
 
 ### Step 2 — Disable DHCP, Change LAN IP, Set Gateway and DNS
 
@@ -70,7 +72,10 @@ service network restart
 
 > **Warning:** Connect the main router's **LAN** port → OpenWrt's **LAN** port. Do NOT use the WAN port — it will cause a routing conflict.
 
-Reconnect to the OpenWrt Wi-Fi and SSH back in at the new IP: `ssh root@192.168.1.2`
+Connect to the OpenWrt Wi-Fi, open a new terminal and SSH back in at the new IP
+```
+ssh root@192.168.1.2
+```
 
 ### Step 4 — Test Connectivity
 
@@ -117,10 +122,15 @@ echo 'cdc_acm'    >> /etc/modules.d/cdc-acm
 ### Step 7 — Verify Modem Detection
 
 ```sh
-dmesg | grep -i 'usb\|rndis\|cdc\|ttyACM' | tail -20
-ls /dev/ttyACM*   # expected: /dev/ttyACM0
-ifconfig usb0     # expected: inet addr in the carrier's network
+dmesg | grep -i 'rndis\|ttyACM' | tail -5
+ls /dev/ttyACM*
+ifconfig usb0
 ```
+
+Expected:
+- `dmesg` shows `rndis_host ... usb0: register 'rndis_host'` and `ttyACM0: USB ACM device`
+- `ls /dev/ttyACM*` returns `/dev/ttyACM0`
+- `ifconfig usb0` shows the interface is present — no IP yet at this stage, that comes after unlock in Part 3
 
 ### Step 8 — Install picocom
 
@@ -174,11 +184,11 @@ Expected: `OK` followed by `+CPIN: PH-NET PIN` indicating the SIM lock is active
 ### Step 11 — Verify Network Registration and Connectivity
 
 ```
-AT+CLCK="PN",2     # lock status: 0=unlocked, 1=locked
-AT+CREG?           # +CREG: x,1 = registered home, x,5 = roaming
-AT+CEREG?          # +CEREG: x,1 = LTE registered
-AT+CSQ             # signal quality: 31,99 = excellent | 99,99 = no signal
-AT+CGPADDR=1       # shows assigned IP from carrier, empty if not connected
+AT+CLCK="PN",2
+AT+CREG?
+AT+CEREG?
+AT+CSQ
+AT+CGPADDR=1
 ```
 
 All green if you see:
@@ -214,16 +224,21 @@ service firewall restart
 ### Step 13 — Verify LTE Connection
 
 ```sh
-ifconfig usb0          # expect inet addr:100.x.x.x (carrier NAT is normal)
-route -n               # wwan/usb0 should appear as the default route
+ifconfig usb0
+route -n
 ping -c 4 -I usb0 8.8.8.8
 ```
+
+Expected:
+- `inet addr:100.x.x.x` on usb0
+- `route -n` shows `0.0.0.0  100.x.x.x  0.0.0.0  UG  0  0  0  usb0`
+- 0% packet loss on ping
 
 ---
 
 ## Part 5 — Switch to Standalone LTE Mode
 
-### Step 14 — Re-enable DHCP on LAN
+### Step 14 — Re-enable DHCP and Revert the LAN IP back on default
 
 While still connected to the main router, re-enable DHCP so clients can get IPs from OpenWrt:
 
@@ -231,16 +246,6 @@ While still connected to the main router, re-enable DHCP so clients can get IPs 
 uci delete dhcp.lan.ignore
 uci commit dhcp
 service dnsmasq restart
-```
-
-### Step 15 — Disconnect from Main Router
-
-Unplug the LAN cable from the main router. OpenWrt will now route all traffic through LTE (usb0) as the default WAN.
-
-Reconnect your computer to the OpenWrt Wi-Fi and SSH back in at the temporary IP:
-
-```sh
-ssh root@192.168.1.2
 ```
 
 Revert the LAN IP back to the default:
@@ -256,9 +261,13 @@ service network restart
 
 > You will lose the SSH session after `service network restart` — this is expected.
 
+### Step 15 — Disconnect from Main Router
+
+Unplug the LAN cable from the main router. OpenWrt will now route all traffic through LTE (usb0) as the default WAN.
+
 ### Step 16 — Final Check
 
-Reconnect your computer to the OpenWrt Wi-Fi and SSH back in:
+Reconnect your computer to the OpenWrt Wi-Fi, open a new terminal and SSH back in at the default IP:
 
 ```sh
 ssh root@192.168.1.1
@@ -267,10 +276,10 @@ ssh root@192.168.1.1
 Run the final verification:
 
 ```sh
-ping -c 4 8.8.8.8       # basic LTE reachability
-ping -c 4 google.com    # DNS + internet
-ip route show           # usb0 should be the default route
-ifconfig usb0           # confirm usb0 has a carrier IP
+ping -c 4 8.8.8.8
+ping -c 4 google.com
+ip route show
+ifconfig usb0
 ```
 
 Expected results:
