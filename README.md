@@ -1,6 +1,6 @@
 # FX-ID5 LTE Modem Setup
 
-OpenWrt 25.05.x · MediaTek MT7628 · Asrmicro LTE
+OpenWrt 25.05.x · MediaTek MT7628 · Marvell LTE
 
 ---
 
@@ -91,7 +91,7 @@ ping -c 4 google.com  # should resolve and respond
 apk update && apk upgrade
 ```
 
-The Asrmicro modem presents as RNDIS/CDC-NCM over USB:
+The Marvell modem presents as RNDIS/CDC-NCM over USB:
 
 ```sh
 apk add kmod-usb-net-rndis    # RNDIS — exposes modem as usb0
@@ -142,22 +142,52 @@ Type `AT` and press Enter. Expected response: `OK`. If no response, check `ls /d
 
 ### Step 10 — Remove SIM Lock
 
-Inside the picocom session:
-`AT+CLCK="PN",0,"3@P#fT&30aTrs4L"`
+Inside the picocom session, check if the modem is locked first:
 
-Expected: `OK`  
-If `ERROR`: the modem may already be unlocked, or this code does not apply to your unit.
+```
+AT+CLCK="PN",2
+```
+
+- `+CLCK: 0` — already unlocked, skip to Step 11
+- `+CLCK: 1` — locked, proceed with unlock below
+
+To unlock:
+
+```
+AT+CLCK="PN",0,"3@P#fT&30aTrs4L"
+```
+
+Expected: `OK` followed by unsolicited messages including `+CPIN: READY` and eventually `+ZCONSTAT: 1,1` indicating the modem connected to the carrier.
+
+If `+CME ERROR: 13`: the unlock code does not match your unit.
 
 > **Warning:** This unlock code is specific to this modem batch. Do not use it on other devices. Repeated failed attempts may permanently lock the modem.
 
+To lock again (e.g. for testing):
+
+```
+AT+CLCK="PN",1,"3@P#fT&30aTrs4L"
+```
+
+Expected: `OK` followed by `+CPIN: PH-NET PIN` indicating the SIM lock is active.
+
+### Step 11 — Verify Network Registration and Connectivity
+
+```
+AT+CLCK="PN",2     # lock status: 0=unlocked, 1=locked
+AT+CREG?           # +CREG: x,1 = registered home, x,5 = roaming
+AT+CEREG?          # +CEREG: x,1 = LTE registered
+AT+CSQ             # signal quality: 31,99 = excellent | 99,99 = no signal
+AT+CGPADDR=1       # shows assigned IP from carrier, empty if not connected
+```
+
+All green if you see:
+- `+CLCK: 0`
+- `+CREG` and `+CEREG` both show `,1` or `,5`
+- `+CSQ` first value is not `99`
+- `+CGPADDR` returns an IP address
+
 Exit picocom: `Ctrl+A` then `Ctrl+X`
-
-### Step 11 — Verify Network Registration
-
-Back in picocom:
-`AT+CREG?`   # +CREG: 0,1  (1=home, 5=roaming)
-`AT+CEREG?`  # +CEREG: 0,1  (LTE registration)
-`AT+CSQ`     # +CSQ: 18,0   (signal quality; 99 = no signal)
 
 ---
 
@@ -193,11 +223,9 @@ ping -c 4 -I usb0 8.8.8.8
 
 ## Part 5 — Switch to Standalone LTE Mode
 
-### Step 14 — Disconnect from Main Router
+### Step 14 — Re-enable DHCP on LAN
 
-Unplug the LAN cable. OpenWrt will now route all traffic through LTE (usb0) as the default WAN.
-
-### Step 15 — Re-enable DHCP on LAN
+While still connected to the main router, re-enable DHCP so clients can get IPs from OpenWrt:
 
 ```sh
 uci delete dhcp.lan.ignore
@@ -205,22 +233,59 @@ uci commit dhcp
 service dnsmasq restart
 ```
 
-### Step 16 — Final Check
+### Step 15 — Disconnect from Main Router
+
+Unplug the LAN cable from the main router. OpenWrt will now route all traffic through LTE (usb0) as the default WAN.
+
+Reconnect your computer to the OpenWrt Wi-Fi and SSH back in at the temporary IP:
 
 ```sh
-ping -c 4 8.8.8.8
-ping -c 4 google.com
-ip route show   # confirm usb0 is the default route
+ssh root@192.168.1.2
 ```
+
+Revert the LAN IP back to the default:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci delete network.lan.gateway
+uci delete network.lan.dns
+uci commit network
+service network restart
+```
+
+> You will lose the SSH session after `service network restart` — this is expected.
+
+### Step 16 — Final Check
+
+Reconnect your computer to the OpenWrt Wi-Fi and SSH back in:
+
+```sh
+ssh root@192.168.1.1
+```
+
+Run the final verification:
+
+```sh
+ping -c 4 8.8.8.8       # basic LTE reachability
+ping -c 4 google.com    # DNS + internet
+ip route show           # usb0 should be the default route
+ifconfig usb0           # confirm usb0 has a carrier IP
+```
+
+Expected results:
+- 0% packet loss on both pings
+- `default via 100.x.x.x dev usb0` in the route table
+- `inet addr:100.x.x.x` on usb0
 
 ---
 
 ## Interface Summary
 
-| Interface | Role       | IP / Details             | Notes                      |
-|-----------|------------|--------------------------|----------------------------|
-| br-lan    | LAN bridge | 192.168.1.2 (AP mode)    | Bridges eth0.1 + phy0-ap0  |
-| usb0      | LTE WAN    | 100.x.x.x (carrier NAT)  | Asrmicro modem via RNDIS   |
-| phy0-ap0  | Wi-Fi AP   | Bridged to br-lan        | MT7628 802.11n 2.4 GHz     |
-| eth0.1    | LAN VLAN   | Bridged to br-lan        | Physical LAN port          |
-| eth0.2    | WAN VLAN   | Unused                   | Physical WAN port          |
+| Interface | Role       | IP / Details                                        | Notes                     |
+|-----------|------------|-----------------------------------------------------|---------------------------|
+| br-lan    | LAN bridge | 192.168.1.2 (AP mode) / 192.168.1.1 (standalone)    | Bridges eth0.1 + phy0-ap0 |
+| usb0      | LTE WAN    | 100.x.x.x (carrier NAT)                             |  Marvell modem via RNDIS  |
+| phy0-ap0  | Wi-Fi AP   | Bridged to br-lan                                   | MT7628 802.11n 2.4 GHz    |
+| eth0.1    | LAN VLAN   | Bridged to br-lan                                   | Physical LAN port         |
+| eth0.2    | WAN VLAN   | Unused                                              | Physical WAN port         |
